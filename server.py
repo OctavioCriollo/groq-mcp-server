@@ -135,6 +135,10 @@ def list_voices(
         temperature: Controls randomness in the model's output (0.0 recommended for STT)
         output_directory: Directory where files should be saved
         save_to_file: Whether to save the transcript to a file
+        max_file_mb: Max audio file size in MB. Default 25 = Groq Free tier limit. Dev tier accepts up to 100. Files larger should be chunked client-side.
+        timeout_s: HTTP read timeout in seconds for the transcription request. Default 600 (10 min) — generous because Groq processing can take seconds to minutes depending on audio length.
+        connect_timeout_s: HTTP connect timeout in seconds. Default 10 — short by design so API outages surface quickly.
+        write_timeout_s: HTTP write/upload timeout in seconds. Default 120 — covers upload of up to ~25 MB on modest bandwidth.
         
     Returns:
         Text content with the transcription or path to the output file
@@ -150,6 +154,10 @@ def transcribe_audio(
     temperature: float = 0.0,
     output_directory: Optional[str] = None,
     save_to_file: bool = True,
+    max_file_mb: int = 25,
+    timeout_s: float = 600.0,
+    connect_timeout_s: float = 10.0,
+    write_timeout_s: float = 120.0,
 ) -> TextContent:
     return core_transcribe_audio(
         input_file_path=input_file_path,
@@ -160,7 +168,11 @@ def transcribe_audio(
         timestamp_granularities=timestamp_granularities,
         temperature=temperature,
         output_directory=output_directory,
-        save_to_file=save_to_file
+        save_to_file=save_to_file,
+        max_file_mb=max_file_mb,
+        timeout_s=timeout_s,
+        connect_timeout_s=connect_timeout_s,
+        write_timeout_s=write_timeout_s,
     )
 
 @mcp.tool(
@@ -177,6 +189,10 @@ def transcribe_audio(
         temperature: Controls randomness in the model's output (0.0 recommended for translation)
         output_directory: Directory where files should be saved
         save_to_file: Whether to save the translation to a file
+        max_file_mb: Max audio file size in MB. Default 25 = Groq Free tier limit. Dev tier accepts up to 100. Files larger should be chunked client-side.
+        timeout_s: HTTP read timeout in seconds for the translation request. Default 600.
+        connect_timeout_s: HTTP connect timeout in seconds. Default 10.
+        write_timeout_s: HTTP write/upload timeout in seconds. Default 120.
         
     Returns:
         Text content with the translation or path to the output file
@@ -190,6 +206,10 @@ def translate_audio(
     temperature: float = 0.0,
     output_directory: Optional[str] = None,
     save_to_file: bool = True,
+    max_file_mb: int = 25,
+    timeout_s: float = 600.0,
+    connect_timeout_s: float = 10.0,
+    write_timeout_s: float = 120.0,
 ) -> TextContent:
     return core_translate_audio(
         input_file_path=input_file_path,
@@ -198,7 +218,11 @@ def translate_audio(
         prompt=prompt,
         temperature=temperature,
         output_directory=output_directory,
-        save_to_file=save_to_file
+        save_to_file=save_to_file,
+        max_file_mb=max_file_mb,
+        timeout_s=timeout_s,
+        connect_timeout_s=connect_timeout_s,
+        write_timeout_s=write_timeout_s,
     )
 
 @mcp.tool(

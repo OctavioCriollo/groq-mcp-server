@@ -55,6 +55,10 @@ def transcribe_audio(
     temperature: float = 0.0,
     output_directory: Optional[str] = None,
     save_to_file: bool = True,
+    max_file_mb: int = 25,
+    timeout_s: float = 600.0,
+    connect_timeout_s: float = 10.0,
+    write_timeout_s: float = 120.0,
 ) -> TextContent:
     # Validate model
     if model not in STT_MODELS:
@@ -71,29 +75,53 @@ def transcribe_audio(
     # Get the input file
     file_path = handle_input_file(input_file_path, audio_content_check=True)
     
-    # Prepare the files for the multipart request
-    files = {
-        "file": (file_path.name, open(file_path, "rb"), "audio/mpeg"),
-        "model": (None, model),
-        "response_format": (None, response_format),
-        "temperature": (None, str(temperature)),
-    }
+    # Preflight file size check (avoids wasted upload on oversize files)
+    size_mb = file_path.stat().st_size / (1024 * 1024)
+    if size_mb > max_file_mb:
+        make_error(
+            f"Audio file is {size_mb:.1f} MB, exceeds max_file_mb={max_file_mb}. "
+            f"Groq Free tier accepts up to 25 MB, Dev tier up to 100 MB. "
+            f"Consider re-encoding to mono/lower bitrate, or use chunking."
+        )
     
-    # Add optional parameters
-    if language:
-        files["language"] = (None, language)
-    if prompt:
-        files["prompt"] = (None, prompt)
-    if timestamp_granularities and response_format == "verbose_json":
-        for granularity in timestamp_granularities:
-            files["timestamp_granularities[]"] = (None, granularity)
-
-    # Make the API request
-    response = httpx.post(
-        "https://api.groq.com/openai/v1/audio/transcriptions",
-        headers={"Authorization": f"Bearer {groq_api_key}"},
-        files=files
+    # Explicit per-phase HTTP timeout. httpx's default of 5s for ALL phases
+    # is far too short for audio transcription (Groq routinely takes 10s+).
+    # - connect: short by design — detect API outages fast.
+    # - write:   covers the upload phase (25 MB at 2 Mbps ≈ 100s).
+    # - read:    the critical one — wait for Groq to transcribe and respond.
+    timeout = httpx.Timeout(
+        connect=connect_timeout_s,
+        read=timeout_s,
+        write=write_timeout_s,
+        pool=10.0,
     )
+    
+    # Open file with context manager so the FD is released even if the request
+    # raises (the original code leaked the handle into httpx's lifecycle).
+    with open(file_path, "rb") as audio_file:
+        files = {
+            "file": (file_path.name, audio_file, "audio/mpeg"),
+            "model": (None, model),
+            "response_format": (None, response_format),
+            "temperature": (None, str(temperature)),
+        }
+        
+        # Add optional parameters
+        if language:
+            files["language"] = (None, language)
+        if prompt:
+            files["prompt"] = (None, prompt)
+        if timestamp_granularities and response_format == "verbose_json":
+            for granularity in timestamp_granularities:
+                files["timestamp_granularities[]"] = (None, granularity)
+
+        # Make the API request with explicit timeout
+        response = httpx.post(
+            "https://api.groq.com/openai/v1/audio/transcriptions",
+            headers={"Authorization": f"Bearer {groq_api_key}"},
+            files=files,
+            timeout=timeout,
+        )
     
     # Check for errors
     if response.status_code != 200:
@@ -149,6 +177,10 @@ def translate_audio(
     temperature: float = 0.0,
     output_directory: Optional[str] = None,
     save_to_file: bool = True,
+    max_file_mb: int = 25,
+    timeout_s: float = 600.0,
+    connect_timeout_s: float = 10.0,
+    write_timeout_s: float = 120.0,
 ) -> TextContent:
     # Validate model - only whisper-large-v3 supports translation
     if model != "whisper-large-v3":
@@ -157,24 +189,42 @@ def translate_audio(
     # Get the input file
     file_path = handle_input_file(input_file_path, audio_content_check=True)
     
-    # Prepare the files for the multipart request
-    files = {
-        "file": (file_path.name, open(file_path, "rb"), "audio/mpeg"),
-        "model": (None, model),
-        "response_format": (None, response_format),
-        "temperature": (None, str(temperature)),
-    }
+    # Preflight file size check (same rationale as transcribe_audio)
+    size_mb = file_path.stat().st_size / (1024 * 1024)
+    if size_mb > max_file_mb:
+        make_error(
+            f"Audio file is {size_mb:.1f} MB, exceeds max_file_mb={max_file_mb}. "
+            f"Groq Free tier accepts up to 25 MB, Dev tier up to 100 MB. "
+            f"Consider re-encoding to mono/lower bitrate, or use chunking."
+        )
     
-    # Add optional parameters
-    if prompt:
-        files["prompt"] = (None, prompt)
-    
-    # Make the API request
-    response = httpx.post(
-        "https://api.groq.com/openai/v1/audio/translations",
-        headers={"Authorization": f"Bearer {groq_api_key}"},
-        files=files
+    # Same explicit per-phase HTTP timeout pattern as transcribe_audio
+    timeout = httpx.Timeout(
+        connect=connect_timeout_s,
+        read=timeout_s,
+        write=write_timeout_s,
+        pool=10.0,
     )
+    
+    with open(file_path, "rb") as audio_file:
+        files = {
+            "file": (file_path.name, audio_file, "audio/mpeg"),
+            "model": (None, model),
+            "response_format": (None, response_format),
+            "temperature": (None, str(temperature)),
+        }
+        
+        # Add optional parameters
+        if prompt:
+            files["prompt"] = (None, prompt)
+        
+        # Make the API request with explicit timeout
+        response = httpx.post(
+            "https://api.groq.com/openai/v1/audio/translations",
+            headers={"Authorization": f"Bearer {groq_api_key}"},
+            files=files,
+            timeout=timeout,
+        )
     
     # Check for errors
     if response.status_code != 200:
