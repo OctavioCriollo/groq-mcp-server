@@ -2,7 +2,7 @@ import os
 import httpx
 from typing import Literal, Optional, List, Dict, Union
 from dotenv import load_dotenv
-from mcp.server.fastmcp import FastMCP, Context, Image
+from mcp.server.mcpserver import MCPServer, Context, Image
 from mcp.types import TextContent
 from src.utils import play_audio as core_play_audio
 
@@ -69,7 +69,7 @@ groq_client = httpx.Client(
 )
 
 # Create an MCP server
-mcp = FastMCP("groq-mcp")
+mcp = MCPServer("groq-mcp")
 
 
 
