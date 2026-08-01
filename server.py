@@ -250,9 +250,9 @@ def list_stt_models() -> TextContent:
         output_directory: Optional directory to save output file (only used if save_to_file is True)
         save_to_file: Whether to save the description to a file (defaults to False)
         ctx: (optional) MCP Context for resource access and progress reporting
-        return_image: If True, return the image as a FastMCP Image object (default False)
+        return_image: If True, return the image as a MCP Image object (default False)
     Returns:
-        Text content with the direct image description, or FastMCP Image if return_image is True, or path to output file if save_to_file is True
+        Text content with the direct image description, or MCP Image if return_image is True, or path to output file if save_to_file is True
     """
 )
 def analyze_image(
@@ -269,7 +269,7 @@ def analyze_image(
     """
     Supports file paths, client-uploaded images/resources via ctx.read_resource(),
     base64-encoded image data, and raw image buffers.
-    If return_image is True, returns a FastMCP Image object (for downstream use).
+    If return_image is True, returns a MCP Image object (for downstream use).
     """
     import os
     # Skip validation for base64 data since we now handle it in _prepare_image_content
@@ -277,10 +277,14 @@ def analyze_image(
     img_data = None
     if ctx is not None and isinstance(image, str) and image.startswith("resource://"):
         # Client resource (uploaded/clipboard image)
-        img_data, mime_type = ctx.read_resource(image) if not hasattr(ctx, 'read_resource') or not callable(ctx.read_resource) else None
-        if img_data is None:
-            img_data, mime_type = ctx.read_resource(image)
-        input_source = img_data
+        # NOTE: Context.read_resource is async in mcp>=2.0.0, but this tool is
+        # sync and cannot await it, so resource:// inputs are not supported here.
+        # Pass a file path or base64-encoded image instead. (Supporting resource://
+        # would require converting this tool to `async def`.)
+        raise ValueError(
+            "resource:// image inputs are not supported by this tool; "
+            "pass a file path or base64-encoded image instead."
+        )
     else:
         # Handle file paths and base64/buffer data
         if isinstance(image, str) and image.startswith("~"):
@@ -317,9 +321,9 @@ def analyze_image(
         output_directory: Optional directory to save output file (only used if save_to_file is True)
         save_to_file: Whether to save the JSON response to a file (defaults to False)
         ctx: (optional) MCP Context for resource access and progress reporting
-        return_image: If True, return the image as a FastMCP Image object (default False)
+        return_image: If True, return the image as a MCP Image object (default False)
     Returns:
-        Text content with the direct JSON response, or FastMCP Image if return_image is True, or path to output file if save_to_file is True
+        Text content with the direct JSON response, or MCP Image if return_image is True, or path to output file if save_to_file is True
     """
 )
 def analyze_image_json(
@@ -336,7 +340,7 @@ def analyze_image_json(
     """
     Supports file paths, client-uploaded images/resources via ctx.read_resource(),
     base64-encoded image data, and raw image buffers.
-    If return_image is True, returns a FastMCP Image object (for downstream use).
+    If return_image is True, returns a MCP Image object (for downstream use).
     """
     import os
     # Skip validation for base64 data since we now handle it in _prepare_image_content
@@ -344,10 +348,14 @@ def analyze_image_json(
     img_data = None
     if ctx is not None and isinstance(image, str) and image.startswith("resource://"):
         # Client resource (uploaded/clipboard image)
-        img_data, mime_type = ctx.read_resource(image) if not hasattr(ctx, 'read_resource') or not callable(ctx.read_resource) else None
-        if img_data is None:
-            img_data, mime_type = ctx.read_resource(image)
-        input_source = img_data
+        # NOTE: Context.read_resource is async in mcp>=2.0.0, but this tool is
+        # sync and cannot await it, so resource:// inputs are not supported here.
+        # Pass a file path or base64-encoded image instead. (Supporting resource://
+        # would require converting this tool to `async def`.)
+        raise ValueError(
+            "resource:// image inputs are not supported by this tool; "
+            "pass a file path or base64-encoded image instead."
+        )
     else:
         # Handle file paths and base64/buffer data
         if isinstance(image, str) and image.startswith("~"):
